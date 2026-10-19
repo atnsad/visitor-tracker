@@ -31,7 +31,7 @@
       // حداکثر ۲ ثانیه برای ثبت بازدید صبر کن
         await Promise.race([
         tracking,
-        new Promise(resolve => setTimeout(resolve, 2000))
+        new Promise(resolve => setTimeout(resolve, 8000))
       ]);
 
       location.replace(DESTINATION);
