@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>در حال انتقال...</title>
+</head>
+<body>
+  <p id="status">لطفاً صبر کنید...</p>
+
+  <script>
+    const TRACKER =
+      "https://visitor-tracker.abtin-sad1393.workers.dev/track";
+
+    const DESTINATION = "https://example.com/";
+
+    async function trackAndRedirect() {
+      const status = document.getElementById("status");
+
+      try {
+        const response = await fetch(TRACKER, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            site_url: location.origin,
+            page_url: location.href,
+            referrer: document.referrer || null
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error("Tracking failed");
+        }
+
+        status.textContent = "ثبت شد؛ در حال انتقال...";
+        location.replace(DESTINATION);
+
+      } catch (error) {
+        status.textContent =
+          "ثبت بازدید ناموفق بود. لطفاً دوباره تلاش کنید.";
+      }
+    }
+
+    trackAndRedirect();
+  </script>
+</body>
+</html>
