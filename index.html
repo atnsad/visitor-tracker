@@ -8,6 +8,7 @@
 <body>
   <p id="status">لطفاً صبر کنید...</p>
 
+
   <script>
     const TRACKER =
       "https://visitor-tracker.abtin-sad1393.workers.dev/track";
@@ -15,35 +16,29 @@
     const DESTINATION = "https://example.com/";
 
     async function trackAndRedirect() {
-      const status = document.getElementById("status");
+      const tracking = fetch(TRACKER, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          site_url: location.origin,
+          page_url: location.href,
+          referrer: document.referrer || null
+        })
+      }).catch(() => {});
 
-      try {
-        const response = await fetch(TRACKER, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            site_url: location.origin,
-            page_url: location.href,
-            referrer: document.referrer || null
-          })
-        });
+      // حداکثر ۲ ثانیه برای ثبت بازدید صبر کن
+        await Promise.race([
+        tracking,
+        new Promise(resolve => setTimeout(resolve, 2000))
+      ]);
 
-        if (!response.ok) {
-          throw new Error("Tracking failed");
-        }
-
-        status.textContent = "ثبت شد؛ در حال انتقال...";
-        location.replace(DESTINATION);
-
-      } catch (error) {
-        status.textContent =
-          "ثبت بازدید ناموفق بود. لطفاً دوباره تلاش کنید.";
-      }
+      location.replace(DESTINATION);
     }
 
     trackAndRedirect();
-  </script>
+</script>
+
 </body>
 </html>
