@@ -1,0 +1,194 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nexar Visitor Tracker</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#e9edff;
+font-family:Tahoma,Arial,sans-serif;padding:22px}
+main{max-width:1100px;margin:auto}
+h1{font-size:25px}
+p{color:#9da9c8}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.card{background:#151d32;border:1px solid #27334e;
+border-radius:14px;padding:18px;margin-bottom:15px;min-width:0}
+.number{font-size:30px;font-weight:bold;margin-top:12px}
+button{background:#7188ff;color:white;border:0;border-radius:9px;
+padding:11px 17px;cursor:pointer;font-size:14px;margin:5px}
+input{background:#111a2d;color:white;border:1px solid #34415e;
+border-radius:8px;padding:11px;width:min(100%,350px)}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:13px}
+th,td{text-align:right;padding:12px;border-bottom:1px solid #29344d}
+th{color:#aebcff}
+.bar{background:#25314c;border-radius:8px;overflow:hidden;height:9px;margin-top:9px}
+.fill{background:#8092ff;height:100%}
+#message{margin:12px 0;color:#aebcff}
+</style>
+</head>
+<body>
+<main>
+  <h1>Nexar Visitor Tracker</h1>
+  <p>پنل آمار بازدید سایت‌ها</p>
+
+  <div class="row">
+    <input id="token" type="password"
+      placeholder="رمز مدیریت (ADMIN_TOKEN)"
+      autocomplete="current-password">
+    <button id="load">دریافت آمار</button>
+    <button id="refresh">تازه‌سازی</button>
+  </div>
+
+  <div id="message">برای مشاهدهٔ آمار، رمز مدیریت را وارد کن.</div>
+
+  <section class="cards">
+    <div class="card">
+      <p>کل بازدیدها</p><div class="number" id="total">—</div>
+    </div>
+    <div class="card">
+      <p>بازدیدهای امروز (UTC)</p><div class="number" id="today">—</div>
+    </div>
+    <div class="card">
+      <p>تعداد سایت‌ها</p><div class="number" id="siteCount">—</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h3>بازدید به تفکیک سایت</h3>
+    <div id="sites">—</div>
+  </section>
+
+  <section class="card">
+    <h3>دستگاه‌ها</h3>
+    <div id="devices">—</div>
+  </section>
+
+  <section class="card">
+    <h3>آخرین بازدیدها</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>زمان</th><th>سایت</th><th>دستگاه</th>
+          <th>مرورگر</th><th>سیستم‌عامل</th>
+          <th>صفحه</th><th>ارجاع‌دهنده</th>
+        </tr></thead>
+        <tbody id="visits"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+const API = "https://visitor-tracker.abtin-sad1393.workers.dev";
+
+const $ = id => document.getElementById(id);
+
+function cell(value) {
+  const td = document.createElement("td");
+  td.textContent = value == null ? "—" : String(value);
+  return td;
+}
+
+async function api(path) {
+  const response = await fetch(API + path, {
+    headers: {
+      Authorization: "Bearer " + $("token").value
+    }
+  });
+
+  if (!response.ok) {
+    if (response.status === 401)
+      throw new Error("رمز مدیریت اشتباه است.");
+    throw new Error("خطای سرور: " + response.status);
+  }
+
+  return response.json();
+}
+
+function renderBreakdown(target, items, nameKey, total) {
+  const root = $(target);
+  root.replaceChildren();
+
+  if (!items.length) {
+    root.textContent = "هنوز بازدیدی ثبت نشده است.";
+    return;
+  }
+
+  for (const item of items) {
+    const section = document.createElement("div");
+    section.style.margin = "16px 0";
+
+    const label = document.createElement("div");
+    label.textContent =
+      String(item[nameKey]) + " — " + item.visits + " بازدید";
+
+    const bar = document.createElement("div");
+    bar.className = "bar";
+
+    const fill = document.createElement("div");
+    fill.className = "fill";
+    fill.style.width =
+      Math.min(100, total ? item.visits / total * 100 : 0) + "%";
+
+    bar.append(fill);
+    section.append(label, bar);
+    root.append(section);
+  }
+}
+
+async function loadDashboard() {
+  $("message").textContent = "در حال دریافت اطلاعات...";
+
+  try {
+    const [stats, recent] = await Promise.all([
+      api("/api/stats"),
+      api("/api/visits?limit=100")
+    ]);
+
+    $("total").textContent = stats.total;
+    $("today").textContent = stats.today;
+    $("siteCount").textContent = stats.sites.length;
+
+    renderBreakdown("sites", stats.sites, "site_url", stats.total);
+    renderBreakdown("devices", stats.devices, "device_type", stats.total);
+
+    const tbody = $("visits");
+    tbody.replaceChildren();
+
+    for (const visit of recent.visits) {
+      const tr = document.createElement("tr");
+
+      let time = visit.created_at;
+      try {
+        time = new Date(visit.created_at).toLocaleString();
+      } catch {}
+
+      const page = visit.page_url || "—";
+      const referrer = visit.referrer || "—";
+
+      for (const value of [
+        time, visit.site_url, visit.device_type,
+        visit.browser, visit.os, page, referrer
+      ]) {
+        tr.append(cell(value));
+      }
+
+      tbody.append(tr);
+    }
+
+    $("message").textContent =
+      "اطلاعات با موفقیت دریافت شد.";
+  } catch (error) {
+    $("message").textContent = error.message;
+  }
+}
+
+$("load").addEventListener("click", loadDashboard);
+$("refresh").addEventListener("click", loadDashboard);
+</script>
+</body>
+</html>
